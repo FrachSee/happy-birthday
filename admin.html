@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Birthday Wish · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@300;400;600&display=swap"
+    rel="stylesheet">
+  <link rel="shortcut icon" type="image/png" href="img/favicon.png" />
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Work Sans", sans-serif;
+      color: #2b2b40;
+      background: linear-gradient(135deg, #fbe9ff 0%, #e8ecff 40%, #e6faff 70%, #fff0f6 100%);
+      background-size: 300% 300%;
+      animation: bg 20s ease infinite;
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    @keyframes bg {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .card {
+      max-width: 760px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.82);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(80, 60, 120, 0.22);
+      backdrop-filter: blur(8px);
+      padding: 28px 30px 34px;
+    }
+
+    h1 {
+      font-family: "Poppins", sans-serif;
+      font-weight: 700;
+      margin: 0 0 4px;
+      font-size: 1.9rem;
+      background: linear-gradient(135deg, #ff6ec4, #7873f5);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .sub { margin: 0 0 22px; color: #6b6785; font-size: 0.95rem; }
+
+    .photo-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.6);
+      margin-bottom: 26px;
+    }
+
+    .photo-preview {
+      width: 110px;
+      height: 110px;
+      border-radius: 14px;
+      object-fit: cover;
+      box-shadow: 0 10px 26px rgba(60, 40, 110, 0.3);
+      background: #eee;
+      flex: 0 0 auto;
+    }
+
+    .photo-actions { flex: 1; }
+    .photo-actions p { margin: 0 0 10px; font-weight: 600; font-family: "Poppins", sans-serif; }
+
+    label.field { display: block; margin-bottom: 16px; }
+    label.field span { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #4a3d6b; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #d9d3ec;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: #2b2b40;
+      background: #fff;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #7873f5;
+      box-shadow: 0 0 0 3px rgba(120, 115, 245, 0.18);
+    }
+
+    textarea { resize: vertical; min-height: 46px; }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-family: "Poppins", sans-serif;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, #ff6ec4, #7873f5);
+      box-shadow: 0 8px 20px rgba(120, 115, 245, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(120, 115, 245, 0.45); }
+    .btn:active { transform: translateY(0); }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.9);
+      color: #4a3d6b;
+      box-shadow: 0 6px 16px rgba(80, 60, 120, 0.18);
+    }
+
+    .btn.small { padding: 7px 12px; font-size: 0.82rem; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+      align-items: center;
+    }
+
+    .actions .spacer { flex: 1; }
+
+    .note {
+      margin-top: 18px;
+      font-size: 0.82rem;
+      color: #6b6785;
+      background: rgba(255, 255, 255, 0.55);
+      border-left: 3px solid #7873f5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(30px);
+      background: #2b2b40;
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 30px;
+      font-weight: 600;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #c0392b; }
+
+    a.preview-link { color: #7873f5; font-weight: 600; text-decoration: none; }
+    a.preview-link:hover { text-decoration: underline; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>Customize your wish</h1>
+    <p class="sub">Replace the photo and edit the text, then <strong>Save</strong>. Changes are stored in this
+      browser and shown on the <a class="preview-link" href="index.html">wish page</a>.</p>
+
+    <div class="photo-row">
+      <img id="photoPreview" class="photo-preview" alt="Current photo" src="img/lydia2.png">
+      <div class="photo-actions">
+        <p>Profile photo</p>
+        <input id="photoInput" type="file" accept="image/*" hidden>
+        <button class="btn small" type="button" id="choosePhoto">Choose new photo</button>
+        <button class="btn small secondary" type="button" id="resetPhoto">Reset photo</button>
+      </div>
+    </div>
+
+    <div id="fields"></div>
+
+    <div class="actions">
+      <button class="btn" type="button" id="save">Save changes</button>
+      <button class="btn secondary" type="button" id="exportJson">Export JSON</button>
+      <span class="spacer"></span>
+      <button class="btn secondary" type="button" id="resetAll">Reset everything</button>
+    </div>
+
+    <div class="note">
+      Notes: Settings are saved to <strong>this browser only</strong> (via localStorage), so they appear on this
+      device. To publish the wish for everyone (e.g. GitHub Pages), commit your changes to <code>customize.json</code>
+      &mdash; use <strong>Export JSON</strong> to download a ready-to-commit file. Photos are automatically resized to
+      keep storage small.
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    var STORAGE_KEY = "hbdOverrides";
+    // Field labels + which ones use a multi-line textarea.
+    var LABELS = {
+      greeting: "Greeting", name: "Name", greetingText: "Greeting subtitle",
+      wishText: "Wish text", text1: "Line 1", textInChatBox: "Chat box message",
+      sendButtonLabel: "Send button label", text2: "Idea line 1", text3: "Idea line 2",
+      text4: "Idea line 3", text4Adjective: "Emphasized word", text5Entry: "Because…",
+      text5Content: "You are…", smiley: "Smiley", bigTextPart1: "Big letter 1",
+      bigTextPart2: "Big letter 2", wishHeading: "Wish heading", outroText: "Outro text",
+      replayText: "Replay text", outroSmiley: "Outro smiley"
+    };
+    var MULTILINE = { greetingText: 1, wishText: 1, textInChatBox: 1, text1: 1, text2: 1, text3: 1, text4: 1, text5Content: 1, outroText: 1, replayText: 1 };
+
+    var defaults = {};
+    var overrides = {};
+    var pendingImage = null; // new data URL chosen this session (before save)
+    var clearImage = false;  // reset-to-default requested this session
+
+    function readOverrides() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+      catch (e) { return {}; }
+    }
+
+    function toast(msg, isError) {
+      var t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "toast show" + (isError ? " error" : "");
+      setTimeout(function () { t.className = "toast"; }, 2200);
+    }
+
+    function buildForm() {
+      var wrap = document.getElementById("fields");
+      wrap.innerHTML = "";
+      Object.keys(defaults).forEach(function (key) {
+        if (key === "imagePath") return; // handled by the photo picker
+        var merged = overrides[key] !== undefined ? overrides[key] : defaults[key];
+        var label = document.createElement("label");
+        label.className = "field";
+        var span = document.createElement("span");
+        span.textContent = (LABELS[key] || key);
+        label.appendChild(span);
+        var input;
+        if (MULTILINE[key]) {
+          input = document.createElement("textarea");
+        } else {
+          input = document.createElement("input");
+          input.type = "text";
+        }
+        input.value = merged;
+        input.setAttribute("data-key", key);
+        label.appendChild(input);
+        wrap.appendChild(label);
+      });
+    }
+
+    function currentPhotoSrc() {
+      if (clearImage) return defaults.imagePath || "img/lydia2.png";
+      if (pendingImage) return pendingImage;
+      if (overrides.imagePath) return overrides.imagePath;
+      return defaults.imagePath || "img/lydia2.png";
+    }
+
+    function init() {
+      overrides = readOverrides();
+      fetch("customize.json")
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          defaults = json;
+          buildForm();
+          document.getElementById("photoPreview").src = currentPhotoSrc();
+        })
+        .catch(function () { toast("Could not load customize.json", true); });
+    }
+
+    // ---- Photo handling: downscale via canvas to keep base64 small ----
+    document.getElementById("choosePhoto").addEventListener("click", function () {
+      document.getElementById("photoInput").click();
+    });
+
+    document.getElementById("photoInput").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        var img = new Image();
+        img.onload = function () {
+          var max = 640;
+          var scale = Math.min(1, max / Math.max(img.width, img.height));
+          var w = Math.round(img.width * scale);
+          var h = Math.round(img.height * scale);
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext("2d");
+          // Flatten onto white so transparent PNGs don't turn black as JPEG.
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, w, h);
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, w, h);
+          pendingImage = canvas.toDataURL("image/jpeg", 0.85);
+          clearImage = false;
+          document.getElementById("photoPreview").src = pendingImage;
+          toast("Photo ready — click Save to apply");
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("resetPhoto").addEventListener("click", function () {
+      pendingImage = null;
+      clearImage = true;
+      document.getElementById("photoPreview").src = defaults.imagePath || "img/lydia2.png";
+      toast("Photo will reset on Save");
+    });
+
+    // ---- Save: build a SPARSE overrides object (only what differs) ----
+    document.getElementById("save").addEventListener("click", function () {
+      var next = {};
+      // Text fields: keep only non-empty values that differ from the default.
+      var inputs = document.querySelectorAll("#fields [data-key]");
+      inputs.forEach(function (el) {
+        var key = el.getAttribute("data-key");
+        var val = el.value;
+        if (val !== "" && val !== defaults[key]) next[key] = val;
+      });
+      // Image: new one wins; explicit reset drops it; otherwise keep existing override.
+      if (pendingImage) next.imagePath = pendingImage;
+      else if (!clearImage && overrides.imagePath) next.imagePath = overrides.imagePath;
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        overrides = next;
+        pendingImage = null;
+        clearImage = false;
+        toast("Saved! Open the wish page to see it.");
+      } catch (err) {
+        var msg = err && err.name === "QuotaExceededError"
+          ? "Save failed — photo too large for storage"
+          : "Save failed — storage unavailable in this browser";
+        toast(msg, true);
+      }
+    });
+
+    // ---- Export merged config as a downloadable customize.json ----
+    document.getElementById("exportJson").addEventListener("click", function () {
+      var merged = Object.assign({}, defaults, overrides);
+      if (pendingImage) merged.imagePath = pendingImage;
+      if (clearImage) merged.imagePath = defaults.imagePath;
+      var blob = new Blob([JSON.stringify(merged, null, 2)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "customize.json";
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      toast("customize.json downloaded");
+    });
+
+    document.getElementById("resetAll").addEventListener("click", function () {
+      if (!confirm("Remove all saved customizations from this browser?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      overrides = {};
+      pendingImage = null;
+      clearImage = false;
+      buildForm();
+      document.getElementById("photoPreview").src = defaults.imagePath || "img/lydia2.png";
+      toast("All customizations cleared");
+    });
+
+    init();
+  </script>
+</body>
+
+</html>

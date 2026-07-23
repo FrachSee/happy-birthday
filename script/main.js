@@ -1,42 +1,68 @@
 // Import the data to customize and insert them into page
+const readOverrides = () => {
+  // Admin-panel overrides live in localStorage. Guard against malformed or
+  // non-object payloads so a bad value can never blank the whole page.
+  try {
+    const parsed = JSON.parse(localStorage.getItem("hbdOverrides"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return {};
+};
+
+const applyData = (data) => {
+  Object.keys(data).forEach((key) => {
+    if (data[key] === "") return;
+    // Exact-match selector so keys that are substrings of others (e.g. "text4"
+    // vs "text4Adjective") can never land on the wrong element.
+    const el = document.querySelector(`[data-node-name="${key}"]`);
+    if (!el) return;
+    if (key === "imagePath") {
+      el.setAttribute("src", data[key]);
+    } else {
+      el.innerText = data[key];
+    }
+  });
+};
+
+// Import the data to customize and insert them into page
 const fetchData = () => {
   fetch("customize.json")
-    .then(data => data.json())
-    .then(data => {
-      dataArr = Object.keys(data);
-      dataArr.map(customData => {
-        if (data[customData] !== "") {
-          if (customData === "imagePath") {
-            document
-              .querySelector(`[data-node-name*="${customData}"]`)
-              .setAttribute("src", data[customData]);
-          } else {
-            document.querySelector(`[data-node-name*="${customData}"]`).innerText = data[customData];
-          }
-        }
-
-        // Check if the iteration is over
-        // Run amimation if so
-        if ( dataArr.length === dataArr.indexOf(customData) + 1 ) {
-          animationTimeline();
-        } 
-      });
+    .then(res => res.json())
+    .then(defaults => {
+      // Overlay any admin overrides on top of the JSON defaults. Replacing the
+      // photo only sets `imagePath`, so the other settings are never disturbed.
+      const data = Object.assign({}, defaults, readOverrides());
+      applyData(data);
+      animationTimeline();
+    })
+    .catch(() => {
+      // If customize.json can't be loaded (e.g. opened via file://), still play
+      // the animation with the hard-coded HTML text.
+      animationTimeline();
     });
 };
 
 // Animation Timeline
 const animationTimeline = () => {
-  // Spit chars that needs to be animated individually
+  // Split chars that need to be animated individually. Use innerText +
+  // Array.from so emoji (surrogate pairs) stay intact, and escape HTML so
+  // characters like & or < don't turn into literal entities.
+  const splitChars = (el) => {
+    const esc = (c) => c.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    el.innerHTML = Array.from(el.innerText)
+      .map((c) => `<span>${esc(c)}</span>`)
+      .join("");
+  };
+
   const textBoxChars = document.getElementsByClassName("hbd-chatbox")[0];
   const hbd = document.getElementsByClassName("wish-hbd")[0];
 
-  textBoxChars.innerHTML = `<span>${textBoxChars.innerHTML
-    .split("")
-    .join("</span><span>")}</span`;
-
-  hbd.innerHTML = `<span>${hbd.innerHTML
-    .split("")
-    .join("</span><span>")}</span`;
+  splitChars(textBoxChars);
+  splitChars(hbd);
 
   const ideaTextTrans = {
     opacity: 0,
@@ -294,6 +320,53 @@ const animationTimeline = () => {
 
   // tl.seek("currentStep");
   // tl.timeScale(2);
+
+  // Festive confetti. Timeline-safe: callbacks added at a label/position add
+  // zero duration and draw on canvas-confetti's own pointer-events:none canvas,
+  // so they never touch GSAP's tweened elements or timings. They re-fire on replay.
+  const COLORS = ["#ff6ec4", "#7873f5", "#42e695", "#ffd166", "#4dd0e1", "#ff5e7e"];
+
+  // Soft welcome burst as the greeting appears.
+  const greetingConfetti = () => {
+    if (typeof confetti !== "function") return;
+    confetti({
+      particleCount: 45,
+      spread: 70,
+      startVelocity: 26,
+      gravity: 0.7,
+      scalar: 0.9,
+      ticks: 180,
+      zIndex: 5,
+      colors: COLORS,
+      origin: { y: 0.6 },
+      disableForReducedMotion: true
+    });
+  };
+
+  // Big celebration at the "Happy Birthday" reveal, with a delayed echo volley.
+  const fireConfetti = () => {
+    if (typeof confetti !== "function") return;
+    const base = {
+      spread: 100,
+      startVelocity: 45,
+      ticks: 260,
+      zIndex: 5,
+      colors: COLORS,
+      shapes: ["square", "circle", "star"],
+      drift: 0,
+      disableForReducedMotion: true
+    };
+    confetti(Object.assign({}, base, { particleCount: 90, angle: 60, scalar: 1.1, drift: 0.4, origin: { x: 0, y: 0.7 } }));
+    confetti(Object.assign({}, base, { particleCount: 90, angle: 120, scalar: 1.1, drift: -0.4, origin: { x: 1, y: 0.7 } }));
+    confetti(Object.assign({}, base, { particleCount: 70, angle: 90, scalar: 0.8, origin: { x: 0.5, y: 0.35 } }));
+    setTimeout(() => {
+      confetti(Object.assign({}, base, { particleCount: 60, angle: 75, scalar: 1.3, origin: { x: 0.15, y: 0.6 } }));
+      confetti(Object.assign({}, base, { particleCount: 60, angle: 105, scalar: 1.3, origin: { x: 0.85, y: 0.6 } }));
+    }, 650);
+  };
+
+  tl.addCallback(greetingConfetti, 0.9);
+  tl.addCallback(fireConfetti, "party");
 
   // Restart Animation on click
   const replyBtn = document.getElementById("replay");
