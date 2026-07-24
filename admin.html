@@ -76,6 +76,16 @@
     .photo-actions { flex: 1; }
     .photo-actions p { margin: 0 0 10px; font-weight: 600; font-family: "Poppins", sans-serif; }
 
+    .music-actions { flex: 1; width: 100%; }
+    .music-actions > p { margin: 0 0 12px; font-weight: 600; font-family: "Poppins", sans-serif; }
+    .music-actions label.inline { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.92rem; cursor: pointer; }
+    .music-actions label.vol { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 0.92rem; }
+    .music-actions label.vol span { font-weight: 600; color: #4a3d6b; }
+    .music-actions label.vol input[type="range"] { flex: 1; accent-color: #7873f5; }
+    .music-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .track-name { margin: 12px 0 0; font-size: 0.85rem; color: #6b6785; font-style: italic; }
+    #audioPreview { width: 100%; margin-top: 10px; }
+
     label.field { display: block; margin-bottom: 16px; }
     label.field span { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #4a3d6b; }
 
@@ -186,6 +196,23 @@
       </div>
     </div>
 
+    <div class="photo-row music-row">
+      <div class="music-actions">
+        <p>Background music</p>
+        <label class="inline"><input type="checkbox" id="autoplayToggle"> Start music automatically</label>
+        <label class="vol"><span>Volume</span>
+          <input type="range" id="volume" min="0" max="1" step="0.05" value="0.55">
+        </label>
+        <div class="music-buttons">
+          <input id="audioInput" type="file" accept="audio/*" hidden>
+          <button class="btn small" type="button" id="chooseAudio">Replace music</button>
+          <button class="btn small secondary" type="button" id="resetAudio">Reset music</button>
+        </div>
+        <p class="track-name" id="trackName">Default track</p>
+        <audio id="audioPreview" controls preload="none"></audio>
+      </div>
+    </div>
+
     <div id="fields"></div>
 
     <div class="actions">
@@ -199,7 +226,8 @@
       Notes: Settings are saved to <strong>this browser only</strong> (via localStorage), so they appear on this
       device. To publish the wish for everyone (e.g. GitHub Pages), commit your changes to <code>customize.json</code>
       &mdash; use <strong>Export JSON</strong> to download a ready-to-commit file. Photos are automatically resized to
-      keep storage small.
+      keep storage small. A replaced music track stays on this device only (there is no file export for it); to publish
+      a new song for everyone, overwrite <code>music/bgm.mp3</code> in the repo.
     </div>
   </div>
 
@@ -219,21 +247,78 @@
     };
     var MULTILINE = { greetingText: 1, wishText: 1, textInChatBox: 1, text1: 1, text2: 1, text3: 1, text4: 1, text5Content: 1, outroText: 1, replayText: 1 };
 
+    var AUDIO_KEY = "hbdAudio";
+    var AUDIO_WARN = 4 * 1024 * 1024;  // 4 MB: warn but allow
+    var AUDIO_MAX = 8 * 1024 * 1024;   // 8 MB: refuse
+
     var defaults = {};
     var overrides = {};
     var pendingImage = null; // new data URL chosen this session (before save)
     var clearImage = false;  // reset-to-default requested this session
+    var pendingAudio = null; // new audio Blob chosen this session (before save)
+    var clearAudio = false;  // reset-music requested this session
 
     function readOverrides() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
       catch (e) { return {}; }
     }
 
+    function readAudioSettings() {
+      try {
+        var s = JSON.parse(localStorage.getItem(AUDIO_KEY));
+        return s && typeof s === "object" ? s : {};
+      } catch (e) { return {}; }
+    }
+
+    // ---- IndexedDB: store the (potentially large) audio Blob outside localStorage ----
+    function openDb() {
+      return new Promise(function (res, rej) {
+        var r = indexedDB.open("hbd-audio", 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore("tracks"); };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { rej(r.error); };
+      });
+    }
+    function idbGet() {
+      return openDb().then(function (db) {
+        return new Promise(function (res, rej) {
+          var t = db.transaction("tracks", "readonly").objectStore("tracks").get("bgm");
+          t.onsuccess = function () { res(t.result); };
+          t.onerror = function () { rej(t.error); };
+        });
+      });
+    }
+    function idbPut(blob, name) {
+      return openDb().then(function (db) {
+        return new Promise(function (res, rej) {
+          var store = db.transaction("tracks", "readwrite").objectStore("tracks");
+          var t = store.put({ blob: blob, name: name, type: blob.type }, "bgm");
+          t.onsuccess = function () { res(); };
+          t.onerror = function () { rej(t.error); };
+          // Some browsers surface quota failures only via transaction abort.
+          store.transaction.onabort = function () { rej(store.transaction.error); };
+        });
+      });
+    }
+    function idbDelete() {
+      return openDb().then(function (db) {
+        return new Promise(function (res, rej) {
+          var store = db.transaction("tracks", "readwrite").objectStore("tracks");
+          var t = store.delete("bgm");
+          t.onsuccess = function () { res(); };
+          t.onerror = function () { rej(t.error); };
+          store.transaction.onabort = function () { rej(store.transaction.error); };
+        });
+      });
+    }
+
+    var toastTimer;
     function toast(msg, isError) {
       var t = document.getElementById("toast");
+      clearTimeout(toastTimer);
       t.textContent = msg;
       t.className = "toast show" + (isError ? " error" : "");
-      setTimeout(function () { t.className = "toast"; }, 2200);
+      toastTimer = setTimeout(function () { t.className = "toast"; }, 2200);
     }
 
     function buildForm() {
@@ -270,6 +355,7 @@
 
     function init() {
       overrides = readOverrides();
+      initMusic();
       fetch("customize.json")
         .then(function (r) { return r.json(); })
         .then(function (json) {
@@ -278,6 +364,36 @@
           document.getElementById("photoPreview").src = currentPhotoSrc();
         })
         .catch(function () { toast("Could not load customize.json", true); });
+    }
+
+    var previewUrl = null;
+    function setPreview(src) {
+      var preview = document.getElementById("audioPreview");
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+      if (src instanceof Blob) {
+        previewUrl = URL.createObjectURL(src);
+        preview.src = previewUrl;
+      } else {
+        preview.src = src;
+      }
+    }
+
+    function initMusic() {
+      var s = readAudioSettings();
+      var vol = document.getElementById("volume");
+      var auto = document.getElementById("autoplayToggle");
+      vol.value = s.volume != null ? s.volume : 0.55;
+      auto.checked = s.autoplay !== false;
+      document.getElementById("audioPreview").volume = parseFloat(vol.value);
+      // Reflect any currently-saved custom track.
+      idbGet().then(function (rec) {
+        if (rec && rec.blob) {
+          document.getElementById("trackName").textContent = rec.name || "Custom track";
+          setPreview(rec.blob);
+        } else {
+          setPreview("music/bgm.mp3");
+        }
+      }).catch(function () { setPreview("music/bgm.mp3"); });
     }
 
     // ---- Photo handling: downscale via canvas to keep base64 small ----
@@ -321,6 +437,59 @@
       toast("Photo will reset on Save");
     });
 
+    // ---- Music handling ----
+    document.getElementById("volume").addEventListener("input", function (e) {
+      document.getElementById("audioPreview").volume = parseFloat(e.target.value);
+    });
+
+    document.getElementById("chooseAudio").addEventListener("click", function () {
+      document.getElementById("audioInput").click();
+    });
+
+    document.getElementById("audioInput").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (file.size > AUDIO_MAX) {
+        toast("Audio too large (max 8 MB)", true);
+        e.target.value = "";
+        return;
+      }
+      if (file.size > AUDIO_WARN) {
+        toast("Large file — may be slow to load", true);
+      }
+      pendingAudio = file;
+      clearAudio = false;
+      document.getElementById("trackName").textContent = file.name;
+      setPreview(file);
+      toast("Music ready — click Save to apply");
+    });
+
+    document.getElementById("resetAudio").addEventListener("click", function () {
+      pendingAudio = null;
+      clearAudio = true;
+      document.getElementById("trackName").textContent = "Default track (resets on Save)";
+      setPreview("music/bgm.mp3");
+      toast("Music will reset on Save");
+    });
+
+    function saveMusic() {
+      var settings = {
+        volume: parseFloat(document.getElementById("volume").value),
+        autoplay: document.getElementById("autoplayToggle").checked
+      };
+      try {
+        localStorage.setItem(AUDIO_KEY, JSON.stringify(settings));
+      } catch (e) { /* settings are tiny; ignore */ }
+
+      if (pendingAudio) {
+        return idbPut(pendingAudio, pendingAudio.name).then(function () { pendingAudio = null; });
+      }
+      if (clearAudio) {
+        return idbDelete().then(function () { clearAudio = false; });
+      }
+      return Promise.resolve();
+    }
+
     // ---- Save: build a SPARSE overrides object (only what differs) ----
     document.getElementById("save").addEventListener("click", function () {
       var next = {};
@@ -340,7 +509,11 @@
         overrides = next;
         pendingImage = null;
         clearImage = false;
-        toast("Saved! Open the wish page to see it.");
+        saveMusic().then(function () {
+          toast("Saved! Open the wish page to see it.");
+        }).catch(function () {
+          toast("Text/photo saved, but the audio track could not be saved", true);
+        });
       } catch (err) {
         var msg = err && err.name === "QuotaExceededError"
           ? "Save failed — photo too large for storage"
@@ -364,13 +537,22 @@
     });
 
     document.getElementById("resetAll").addEventListener("click", function () {
-      if (!confirm("Remove all saved customizations from this browser?")) return;
+      if (!confirm("Remove all saved customizations (text, photo and music) from this browser?")) return;
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(AUDIO_KEY);
+      localStorage.removeItem("hbdMuted");
+      idbDelete().catch(function () {});
       overrides = {};
       pendingImage = null;
       clearImage = false;
+      pendingAudio = null;
+      clearAudio = false;
       buildForm();
       document.getElementById("photoPreview").src = defaults.imagePath || "img/lydia2.png";
+      document.getElementById("volume").value = 0.55;
+      document.getElementById("autoplayToggle").checked = true;
+      document.getElementById("trackName").textContent = "Default track";
+      setPreview("music/bgm.mp3");
       toast("All customizations cleared");
     });
 
